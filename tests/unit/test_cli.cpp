@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "onnxcc/cli.h"
+#include "onnxcc/cli/cli.h"
 
 namespace {
 
@@ -19,7 +19,7 @@ CliResult run_cli(std::vector<const char*> args) {
     args.insert(args.begin(), "onnxcc");
     std::ostringstream out;
     std::ostringstream err;
-    const int code = onnxcc::run(static_cast<int>(args.size()), args.data(), out, err);
+    const int code = onnxcc::cli::run(static_cast<int>(args.size()), args.data(), out, err);
     return {code, out.str(), err.str()};
 }
 
