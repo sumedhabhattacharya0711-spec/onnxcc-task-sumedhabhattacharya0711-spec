@@ -9,7 +9,8 @@
 !/README.md
 !/CMakeLists.txt
 !/tests/
-
+!/CMakePresets.json
+!/.clang-format
 # Ignore these files and directories
 .DS_Store
 
