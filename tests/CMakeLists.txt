@@ -21,3 +21,23 @@ target_compile_definitions(unit_tests
 include(GoogleTest)
 # run the exe in background and discover all the tests in the unit_tests executable and register them with CTest. 
 gtest_discover_tests(unit_tests)
+function(onnxcc_add_e2e_test name args expected_code expected_stream)
+    add_test(
+        NAME e2e.${name}
+        COMMAND ${CMAKE_COMMAND}
+            -DEXE=$<TARGET_FILE:onnxcc>
+            -DARGS=${args}
+            -DEXPECT_CODE=${expected_code}
+            -DEXPECT_STREAM=${expected_stream}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/e2e/check_cli.cmake
+    )
+endfunction()
+
+set(ONNXCC_E2E_MODEL "${CMAKE_CURRENT_BINARY_DIR}/e2e_model.onnx")
+file(TOUCH "${ONNXCC_E2E_MODEL}")
+
+onnxcc_add_e2e_test(top_level_help "--help" 0 stdout)
+onnxcc_add_e2e_test(no_arguments "" 2 stderr)
+onnxcc_add_e2e_test(dump_valid_model "dump|--model|${ONNXCC_E2E_MODEL}" 0 stdout)
+onnxcc_add_e2e_test(unknown_subcommand "explode" 2 stderr)
+onnxcc_add_e2e_test(missing_model_file "dump|--model|does_not_exist.onnx" 1 stderr)
