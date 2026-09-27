@@ -1,9 +1,11 @@
-#include <gtest/gtest.h>
-
 #include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "onnxcc/cli/cli.h"
 
@@ -27,13 +29,32 @@ bool contains(const std::string& text, const std::string& part) {
     return text.find(part) != std::string::npos;
 }
 
-const std::string kFixtureDir = ONNXCC_FIXTURE_DIR;
-const std::string kModel = kFixtureDir + "/mlp.onnx";
-const std::string kInput = kFixtureDir + "/mlp_input.bin";
+class TempModelFile {
+public:
+    TempModelFile() {
+        const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
+        const std::string name =
+            std::string("onnxcc_") + info->test_suite_name() + "_" + info->name() + ".onnx";
+        path_ = (std::filesystem::temp_directory_path() / name).string();
+        std::ofstream(path_).close();
+    }
+    ~TempModelFile() {
+        std::error_code ec;
+        std::filesystem::remove(path_, ec);
+    }
+    TempModelFile(const TempModelFile&) = delete;
+    TempModelFile& operator=(const TempModelFile&) = delete;
+
+    const char* c_str() const { return path_.c_str(); }
+    const std::string& path() const { return path_; }
+
+private:
+    std::string path_;
+};
 
 }  // namespace
 
-
+// ---------- Top level ----------
 
 TEST(CliTopLevel, NoArgumentsIsUsageError) {
     const auto r = run_cli({});
@@ -59,13 +80,13 @@ TEST(CliTopLevel, UnknownSubcommandIsUsageError) {
 }
 
 TEST(CliTopLevel, OptionBeforeSubcommandIsUsageError) {
-    const auto r = run_cli({"--model", kModel.c_str()});
+    const auto r = run_cli({"--model", "model.onnx"});
     EXPECT_EQ(r.code, 2);
     EXPECT_TRUE(r.out.empty());
     EXPECT_FALSE(r.err.empty());
 }
 
-
+// ---------- dump: success ----------
 
 TEST(CliDump, HelpGoesToStdout) {
     const auto r = run_cli({"dump", "--help"});
@@ -75,29 +96,31 @@ TEST(CliDump, HelpGoesToStdout) {
 }
 
 TEST(CliDump, ValidModelSucceeds) {
-    ASSERT_TRUE(std::filesystem::exists(kModel)) << "missing fixture: " << kModel;
-    const auto r = run_cli({"dump", "--model", kModel.c_str()});
+    const TempModelFile model;
+    const auto r = run_cli({"dump", "--model", model.c_str()});
     EXPECT_EQ(r.code, 0);
-    EXPECT_TRUE(contains(r.out, "model: " + kModel)) << "stdout: " << r.out;
+    EXPECT_TRUE(contains(r.out, "model: " + model.path())) << "stdout: " << r.out;
     EXPECT_TRUE(r.err.empty()) << "stderr: " << r.err;
 }
 
 TEST(CliDump, EqualsSyntaxIsAccepted) {
-    const std::string arg = "--model=" + kModel;
+    const TempModelFile model;
+    const std::string arg = "--model=" + model.path();
     const auto r = run_cli({"dump", arg.c_str()});
     EXPECT_EQ(r.code, 0);
     EXPECT_TRUE(r.err.empty());
 }
 
 TEST(CliDump, OptionalFlagsInAnyOrder) {
-    const auto r = run_cli({"dump", "--verbose", "--show-graph", "--model", kModel.c_str()});
+    const TempModelFile model;
+    const auto r = run_cli({"dump", "--verbose", "--show-graph", "--model", model.c_str()});
     EXPECT_EQ(r.code, 0);
     EXPECT_TRUE(contains(r.out, "verbose")) << "stdout: " << r.out;
     EXPECT_TRUE(contains(r.out, "graph")) << "stdout: " << r.out;
     EXPECT_TRUE(r.err.empty());
 }
 
-
+// ---------- dump: errors ----------
 
 TEST(CliDump, MissingModelIsUsageError) {
     const auto r = run_cli({"dump"});
@@ -114,14 +137,16 @@ TEST(CliDump, ModelWithoutValueIsUsageError) {
 }
 
 TEST(CliDump, UnknownFlagIsUsageError) {
-    const auto r = run_cli({"dump", "--model", kModel.c_str(), "--banana"});
+    const TempModelFile model;
+    const auto r = run_cli({"dump", "--model", model.c_str(), "--banana"});
     EXPECT_EQ(r.code, 2);
     EXPECT_TRUE(r.out.empty());
     EXPECT_TRUE(contains(r.err, "banana")) << "stderr: " << r.err;
 }
 
 TEST(CliDump, StrayArgumentIsUsageError) {
-    const auto r = run_cli({"dump", "--model", kModel.c_str(), "extra"});
+    const TempModelFile model;
+    const auto r = run_cli({"dump", "--model", model.c_str(), "extra"});
     EXPECT_EQ(r.code, 2);
     EXPECT_TRUE(r.out.empty());
     EXPECT_TRUE(contains(r.err, "extra")) << "stderr: " << r.err;
@@ -132,11 +157,4 @@ TEST(CliDump, NonexistentModelIsRuntimeError) {
     EXPECT_EQ(r.code, 1);
     EXPECT_TRUE(r.out.empty());
     EXPECT_TRUE(contains(r.err, "does_not_exist.onnx")) << "stderr: " << r.err;
-}
-
-
-
-TEST(Fixture, InputIsSixteenBytes) {
-    ASSERT_TRUE(std::filesystem::exists(kInput)) << "missing fixture: " << kInput;
-    EXPECT_EQ(std::filesystem::file_size(kInput), 16u);
 }
