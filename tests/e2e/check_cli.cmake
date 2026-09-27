@@ -1,3 +1,9 @@
+# End-to-end check: runs the onnxcc binary and verifies its exit code and output streams.
+# Invoked by CTest as:
+#   cmake -DEXE=<binary> -DARGS=<a|b|c> -DEXPECT_CODE=<n> -DEXPECT_STREAM=stdout|stderr -P check_cli.cmake
+# ARGS uses '|' as a separator because ';' would be split by add_test before reaching this script.
+
+
 string(REPLACE "|" ";" cli_args "${ARGS}")
 
 execute_process(

@@ -13,6 +13,7 @@ target_link_libraries(unit_tests
 target_compile_options(unit_tests PRIVATE ${ONNXCC_WARNINGS})
 
 # Make the directory path available to the executable as a preprocessor macro because ctest runs from build/ while relative paths are relative to source dir
+# Build tests with the same warning flags as the library, so problems in test code are caught too.
 target_compile_definitions(unit_tests
     PRIVATE
         ONNXCC_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
@@ -34,8 +35,11 @@ function(onnxcc_add_e2e_test name args expected_code expected_stream)
 endfunction()
 
 set(ONNXCC_E2E_MODEL "${CMAKE_CURRENT_BINARY_DIR}/e2e_model.onnx")
+# Empty model file in the build tree, so these tests don't depend on generated fixtures.
 file(TOUCH "${ONNXCC_E2E_MODEL}")
 
+# End-to-end tests run the real binary, covering what unit tests cannot reach:
+# main.cpp wiring the real stdout/stderr and returning the exit code.
 onnxcc_add_e2e_test(top_level_help "--help" 0 stdout)
 onnxcc_add_e2e_test(no_arguments "" 2 stderr)
 onnxcc_add_e2e_test(dump_valid_model "dump|--model|${ONNXCC_E2E_MODEL}" 0 stdout)

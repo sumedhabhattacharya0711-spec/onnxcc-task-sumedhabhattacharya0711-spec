@@ -8,7 +8,8 @@
 #include "onnxcc/cli/subcommands.h"
 
 namespace onnxcc::cli {
-
+// The dump subcommand. Currently a skeleton: it validates the arguments and the model path,
+// but does not parse the model yet
 int run_dump(int argc, const char* const* argv, std::ostream& out, std::ostream& err) {
     cxxopts::Options options("onnxcc dump", "Inspect an ONNX model");
     auto add_option = options.add_options();
@@ -19,12 +20,16 @@ int run_dump(int argc, const char* const* argv, std::ostream& out, std::ostream&
 
     try {
         const auto result = options.parse(argc, argv);
+         // Help first, so "dump --help" works without --model.
         if (result.count("help") > 0) {
             out << options.help();
             return kExitOk;
         }
+        // cxxopts silently ignores stray words; reject them so mistakes like "verbose"
+        // (missing the --) are reported instead of ignored.
         if (!result.unmatched().empty()) {
             err << "onnxcc dump: unexpected argument '" << result.unmatched().front() << "'\n"
+           
                 << "Try 'onnxcc dump --help'.\n";
             return kExitUsage;
         }
@@ -35,6 +40,7 @@ int run_dump(int argc, const char* const* argv, std::ostream& out, std::ostream&
         }
         const auto model = result["model"].as<std::string>();
         std::error_code ec;
+        // Non-throwing overload: any filesystem error counts as "cannot open". Also rejects directories.
         if (!std::filesystem::is_regular_file(model, ec)) {
             err << "onnxcc dump: cannot open model file: " << model << "\n";
             return kExitFailure;
@@ -48,11 +54,16 @@ int run_dump(int argc, const char* const* argv, std::ostream& out, std::ostream&
             out << "graph: (not implemented yet)\n";
         }
         return kExitOk;
-    } catch (const cxxopts::exceptions::exception& e) {
+    } 
+    // All checks finish before anything is written to `out`, so a failing command
+    // never leaves partial output on stdout.
+    catch (const cxxopts::exceptions::exception& e) {
         err << "onnxcc dump: " << e.what() << "\n"
+        
             << "Try 'onnxcc dump --help'.\n";
         return kExitUsage;
     }
+    
 }
 
 }  // namespace onnxcc::cli

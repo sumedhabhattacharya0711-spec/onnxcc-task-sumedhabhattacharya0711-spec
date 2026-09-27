@@ -1,3 +1,6 @@
+// Unit tests for the CLI contract (see README.md). Each test checks the exit code, that the
+// expected stream has output, and that the other stream stays empty.
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -16,7 +19,8 @@ struct CliResult {
     std::string out;
     std::string err;
 };
-
+// Runs the CLI with in-memory streams so stdout and stderr can be inspected separately.
+// Prepends the program name, since argv[0] is always the program.
 CliResult run_cli(std::vector<const char*> args) {
     args.insert(args.begin(), "onnxcc");
     std::ostringstream out;
@@ -24,7 +28,7 @@ CliResult run_cli(std::vector<const char*> args) {
     const int code = onnxcc::cli::run(static_cast<int>(args.size()), args.data(), out, err);
     return {code, out.str(), err.str()};
 }
-
+// Tests match key fragments rather than whole messages, so rewording a message doesn't break them.
 bool contains(const std::string& text, const std::string& part) {
     return text.find(part) != std::string::npos;
 }

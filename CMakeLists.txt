@@ -69,6 +69,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 add_library(cxxopts INTERFACE)
 add_library(cxxopts::cxxopts ALIAS cxxopts)
+# cxxopts v3.3.1, vendored as a single header (license: third_party/cxxopts/LICENSE).
+# SYSTEM keeps warnings from its code out of our -Wall -Wextra -Wpedantic output.
 target_include_directories(cxxopts SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/cxxopts)
 # should be in the root for project-wide effect
 enable_testing()

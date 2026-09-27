@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
-
+# Pinned so the output doesn't depend on the installed onnx version's defaults.
+# IR version 7 is the file-format version that matches opset 13.
 SEED = 42
 OPSET = 13
 IR_VERSION = 7
@@ -17,7 +18,8 @@ OUT_DIR = REPO_ROOT / "tests" / "fixtures"
 MODEL_PATH = OUT_DIR / "mlp.onnx"
 INPUT_PATH = OUT_DIR / "mlp_input.bin"
 
-
+# MatMul computes x @ W, so weights are stored as [in, out]
+# (the transpose of PyTorch's nn.Linear layout).
 def make_weights(rng: np.random.Generator) -> dict[str, np.ndarray]:
     return {
         "W1": rng.standard_normal((4, 8)).astype(np.float32),
@@ -28,6 +30,7 @@ def make_weights(rng: np.random.Generator) -> dict[str, np.ndarray]:
 
 
 def build_model(weights: dict[str, np.ndarray]) -> onnx.ModelProto:
+    # Nodes are connected by tensor names: one node's output name is the next node's input name.
     nodes = [
         helper.make_node("MatMul", ["x", "W1"], ["mm1"], name="matmul1"),
         helper.make_node("Add", ["mm1", "b1"], ["h1"], name="add1"),
@@ -50,16 +53,20 @@ def build_model(weights: dict[str, np.ndarray]) -> onnx.ModelProto:
         producer_name="onnxcc-fixtures",
     )
     model.ir_version = IR_VERSION
+    # full_check also runs shape inference, so shape mistakes fail here, before anything is saved.
     onnx.checker.check_model(model, full_check=True)
     return model
 
-
+# The same computation in plain numpy, printed as the expected output
+# so the model can be cross-checked against ONNX Runtime.
 def reference_forward(x: np.ndarray, weights: dict[str, np.ndarray]) -> np.ndarray:
     a1 = np.maximum(x @ weights["W1"] + weights["b1"], 0)
     return np.maximum(a1 @ weights["W2"] + weights["b2"], 0)
 
 
 def main() -> None:
+    # One seeded generator for the weights and then the input, in a fixed order,
+    # makes every run produce identical files.
     rng = np.random.default_rng(SEED)
     weights = make_weights(rng)
     x = rng.standard_normal((1, 4)).astype(np.float32)
@@ -67,7 +74,7 @@ def main() -> None:
     model = build_model(weights)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     onnx.save(model, MODEL_PATH)
-
+    # '<f4' = little-endian float32 with no header: the same 16 bytes on every machine.
     INPUT_PATH.write_bytes(x.astype("<f4").tobytes())
 
     assert INPUT_PATH.stat().st_size == 16, "input must be exactly 16 bytes"
