@@ -11,6 +11,7 @@
 !/tests/
 !/CMakePresets.json
 !/.clang-format
+!/third_party/
 # Ignore these files and directories
 .DS_Store
 

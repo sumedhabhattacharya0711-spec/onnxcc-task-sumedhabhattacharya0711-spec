@@ -67,14 +67,9 @@ FetchContent_Declare(
     SYSTEM
 )
 FetchContent_MakeAvailable(googletest)
-FetchContent_Declare(
-    cxxopts
-    GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
-    GIT_TAG v3.3.1
-    GIT_SHALLOW TRUE
-    SYSTEM
-)
-FetchContent_MakeAvailable(cxxopts)
+add_library(cxxopts INTERFACE)
+add_library(cxxopts::cxxopts ALIAS cxxopts)
+target_include_directories(cxxopts SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/third_party/cxxopts)
 # should be in the root for project-wide effect
 enable_testing()
 
