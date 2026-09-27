@@ -1,13 +1,19 @@
+# Generates the onnxcc test fixtures: a 4 -> 8 -> 2 MLP with Relu after each layer.
+# Graph: 6 nodes (MatMul, Add, Relu, MatMul, Add, Relu), 4 initializers (W1, b1, W2, b2).
+# Outputs tests/fixtures/mlp.onnx and tests/fixtures/mlp_input.bin (1x4 float32, 16 raw bytes).
+
 from pathlib import Path
+
 import numpy as np
 import onnx
-from onnx import helper, TensorProto, numpy_helper
+from onnx import TensorProto, helper, numpy_helper
 
 SEED = 42
-OPSET = 17
-IR_VERSION = 8
+OPSET = 13
+IR_VERSION = 7
 
-OUT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
+OUT_DIR = REPO_ROOT / "tests" / "fixtures"
 MODEL_PATH = OUT_DIR / "mlp.onnx"
 INPUT_PATH = OUT_DIR / "mlp_input.bin"
 
@@ -59,15 +65,17 @@ def main() -> None:
     x = rng.standard_normal((1, 4)).astype(np.float32)
 
     model = build_model(weights)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     onnx.save(model, MODEL_PATH)
 
     INPUT_PATH.write_bytes(x.astype("<f4").tobytes())
 
     assert INPUT_PATH.stat().st_size == 16, "input must be exactly 16 bytes"
 
-    print(f"wrote {MODEL_PATH.name}: {len(model.graph.node)} nodes, "
-          f"{len(model.graph.initializer)} initializers")
-    print(f"wrote {INPUT_PATH.name}: {INPUT_PATH.stat().st_size} bytes")
+    print(f"wrote {MODEL_PATH.relative_to(REPO_ROOT)}: {len(model.graph.node)} nodes, "
+          f"{len(model.graph.initializer)} initializers, opset {OPSET}")
+    print("op types:", [node.op_type for node in model.graph.node])
+    print(f"wrote {INPUT_PATH.relative_to(REPO_ROOT)}: {INPUT_PATH.stat().st_size} bytes")
     print("input:          ", x)
     print("expected output:", reference_forward(x, weights))
 
